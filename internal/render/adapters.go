@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"videoremix/internal/binaries"
 	"videoremix/internal/download"
@@ -202,7 +203,7 @@ func subtitleFilter(s recipe.Subtitle) string {
 	}
 	size := s.FontSize
 	if size <= 0 {
-		size = 24
+		size = 32 // larger default so it's readable
 	}
 	color := s.Color
 	if color == "" {
@@ -224,8 +225,12 @@ func subtitleFilter(s recipe.Subtitle) string {
 		fontArg = "fontfile='" + escapeFontPath(f) + "':"
 	}
 
+	// borderw + shadow make text readable over any background; box adds a
+	// semi-transparent backdrop.
 	return fmt.Sprintf(
-		"drawtext=%stext='%s':fontcolor=%s:fontsize=%d:x=(w-text_w)/2:y=%s:box=1:boxcolor=black@0.5:boxborderw=8",
+		"drawtext=%stext='%s':fontcolor=%s:fontsize=%d:x=(w-text_w)/2:y=%s:"+
+			"borderw=2:bordercolor=black:shadowx=1:shadowy=1:shadowcolor=black@0.6:"+
+			"box=1:boxcolor=black@0.45:boxborderw=10",
 		fontArg, txt, color, size, y,
 	)
 }
@@ -285,32 +290,81 @@ func escapeDrawtext(s string) string {
 	return r.Replace(s)
 }
 
-// GPUProbe selects a hardware path, falling back to CPU when GPU is
-// unavailable/unconfigured.
+// GPUProbe selects a hardware path automatically: it prefers a working GPU
+// encoder (NVIDIA nvenc → AMD amf → Intel qsv) and falls back to CPU. The probe
+// result is cached so detection runs once per process.
 type GPUProbe struct {
 	run    commandRunner
 	binary string
+
+	once     sync.Once
+	detected EncodingPath // cached GPU path (Codec=="" means none found)
 }
 
 func NewGPUProbe() *GPUProbe { return &GPUProbe{run: execRunner, binary: resolve(binaries.FFmpeg)} }
 
 func (p *GPUProbe) Select(cfg RenderConfig) (EncodingPath, error) {
-	preset := cfg.Preset
-	if preset == "" {
-		preset = "medium"
+	// CPU path: cap threads to keep CPU/RAM load reasonable under parallelism.
+	cpuThreads := cfg.Threads
+	if cpuThreads <= 0 {
+		// Default: half the logical CPUs (min 2), leaving headroom for other
+		// parallel renders and the OS.
+		cpuThreads = runtime.NumCPU() / 2
+		if cpuThreads < 2 {
+			cpuThreads = 2
+		}
 	}
-	if cfg.PreferGPU && p.hasNVENC() {
-		return EncodingPath{UseGPU: true, Codec: "h264_nvenc", Preset: preset}, nil
+	cpu := EncodingPath{
+		UseGPU:  false,
+		Codec:   "libx264",
+		Preset:  orDefault(cfg.Preset, "veryfast"), // faster + lighter than "medium"
+		Threads: cpuThreads,
 	}
-	return EncodingPath{UseGPU: false, Codec: "libx264", Preset: preset}, nil
+
+	// When GPU isn't explicitly disabled, auto-detect and use it if available.
+	if !cfg.DisableGPU {
+		gpu := p.detectGPU()
+		if gpu.Codec != "" {
+			// Allow an explicit preset override; else keep the encoder default.
+			if cfg.Preset != "" {
+				gpu.Preset = cfg.Preset
+			}
+			return gpu, nil
+		}
+	}
+	return cpu, nil
 }
 
-func (p *GPUProbe) hasNVENC() bool {
-	out, err := p.run(p.binary, "-hide_banner", "-encoders")
-	if err != nil {
-		return false
+// detectGPU probes available encoders once and returns the best GPU path, or an
+// empty EncodingPath if none is usable.
+func (p *GPUProbe) detectGPU() EncodingPath {
+	p.once.Do(func() {
+		out, err := p.run(p.binary, "-hide_banner", "-encoders")
+		if err != nil {
+			return
+		}
+		enc := string(out)
+		switch {
+		case strings.Contains(enc, "h264_nvenc"):
+			// NVIDIA: p1(fastest)..p7(slowest). p4 = balanced. cuda hwaccel for
+			// GPU-side decode too.
+			p.detected = EncodingPath{UseGPU: true, Codec: "h264_nvenc", Preset: "p4", HWAccel: "cuda"}
+		case strings.Contains(enc, "h264_amf"):
+			// AMD AMF: quality/balanced/speed.
+			p.detected = EncodingPath{UseGPU: true, Codec: "h264_amf", Preset: "balanced", HWAccel: "d3d11va"}
+		case strings.Contains(enc, "h264_qsv"):
+			// Intel Quick Sync.
+			p.detected = EncodingPath{UseGPU: true, Codec: "h264_qsv", Preset: "medium", HWAccel: "qsv"}
+		}
+	})
+	return p.detected
+}
+
+func orDefault(v, d string) string {
+	if v == "" {
+		return d
 	}
-	return strings.Contains(string(out), "h264_nvenc")
+	return v
 }
 
 // CLIFFmpegExecutor invokes the local ffmpeg CLI.
@@ -332,6 +386,11 @@ func (e *CLIFFmpegExecutor) Execute(t Timeline, graph FilterGraph, path Encoding
 	hasMusic := strings.TrimSpace(music.FilePath) != ""
 
 	args := []string{"-y"}
+
+	// GPU-assisted decode when a hwaccel was selected (reduces CPU load).
+	if path.HWAccel != "" {
+		args = append(args, "-hwaccel", path.HWAccel)
+	}
 
 	// Trim window applies to the source input (before -i for fast seek).
 	var trimArgs []string
@@ -372,7 +431,16 @@ func (e *CLIFFmpegExecutor) Execute(t Timeline, graph FilterGraph, path Encoding
 		}
 	}
 
-	args = append(args, "-c:v", path.Codec, "-preset", path.Preset, "-c:a", "aac", outputPath)
+	args = append(args, "-c:v", path.Codec, "-preset", path.Preset)
+	// Cap CPU threads on the CPU path to reduce CPU/RAM pressure.
+	if !path.UseGPU && path.Threads > 0 {
+		args = append(args, "-threads", strconv.Itoa(path.Threads))
+	}
+	args = append(args, "-c:a", "aac", outputPath)
+
+	if os.Getenv("VIDEOREMIX_DEBUG") != "" {
+		fmt.Fprintln(os.Stderr, "[ffmpeg] "+strings.Join(args, " "))
+	}
 
 	if out, err := e.run(e.binary, args...); err != nil {
 		return "", fmt.Errorf("ffmpeg exec: %w (output: %s)", err, tail(string(out), 400))

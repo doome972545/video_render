@@ -13,8 +13,14 @@ import (
 // EncodingPath describes the selected hardware encoding route.
 type EncodingPath struct {
 	UseGPU bool
-	Codec  string // e.g. "libx264", "h264_nvenc"
-	Preset string
+	Codec  string // e.g. "libx264", "h264_nvenc", "h264_amf"
+	Preset string // preset name valid for the chosen Codec
+	// HWAccel is the ffmpeg -hwaccel value for GPU-assisted decode (e.g.
+	// "cuda"). Empty = CPU decode.
+	HWAccel string
+	// Threads limits CPU worker threads (0 = ffmpeg default). Used to cap CPU
+	// and RAM load, especially when many renders run in parallel.
+	Threads int
 }
 
 // Timeline is the assembled segment/layer/track structure from a Recipe.
@@ -65,9 +71,15 @@ type OutputValidator interface {
 
 // RenderConfig holds hardware/encoding preferences.
 type RenderConfig struct {
-	PreferGPU  bool
+	// PreferGPU is kept for compatibility; GPU is now auto-detected unless
+	// DisableGPU is set.
+	PreferGPU bool
+	// DisableGPU forces CPU encoding even when a GPU encoder is available.
+	DisableGPU bool
 	Preset     string
 	OutputDir  string
+	// Threads caps CPU worker threads on the CPU path (0 = auto).
+	Threads int
 }
 
 // Renderer is invoked per Job by the Queue's Worker Dispatcher.

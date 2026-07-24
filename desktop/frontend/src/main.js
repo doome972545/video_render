@@ -82,6 +82,13 @@ document.querySelector('#app').innerHTML = `
       </label>
     </div>
 
+    <div class="field checkbox-field">
+      <label class="checkbox">
+        <input id="noGPU" type="checkbox" />
+        <span>Force CPU (disable GPU — GPU is used automatically by default)</span>
+      </label>
+    </div>
+
     <div class="row actions">
       <button class="btn" id="start">Start Remix</button>
       <button class="btn danger" id="cancel" disabled>Cancel</button>
@@ -173,6 +180,7 @@ $('start').addEventListener('click', async () => {
     subtitlePos: $('subPos').value,
     extraEffects: $('extraFx').checked,
     flip: $('flip').value,
+    noGPU: $('noGPU').checked,
   };
 
   setBusy(true);

@@ -19,7 +19,8 @@ type App struct {
 
 	mu        sync.Mutex
 	svc       *core.Service
-	outputDir string // the output dir the current svc was built for
+	outputDir  string // the output dir the current svc was built for
+	disableGPU bool   // the GPU setting the current svc was built for
 }
 
 // NewApp creates a new App application struct.
@@ -40,28 +41,28 @@ func (a *App) shutdown(ctx context.Context) {
 	}
 }
 
-// service returns a core.Service configured for the given output directory,
-// (re)creating it when the output directory changes. The core Service is cheap
-// to construct, so swapping it on output change avoids any core API changes.
-func (a *App) service(outputDir string) (*core.Service, error) {
+// service returns a core.Service configured for the given output directory and
+// GPU setting, (re)creating it when either changes. The core Service is cheap
+// to construct, so swapping it avoids any core API changes.
+func (a *App) service(outputDir string, disableGPU bool) (*core.Service, error) {
 	if outputDir == "" {
 		outputDir = filepath.Join(".", "output")
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	if a.svc != nil && a.outputDir == outputDir {
+	if a.svc != nil && a.outputDir == outputDir && a.disableGPU == disableGPU {
 		return a.svc, nil
 	}
-	// Output changed (or first use): rebuild the Service.
+	// Config changed (or first use): rebuild the Service.
 	if a.svc != nil {
 		a.svc.Close()
 		a.svc = nil
 	}
 	svc, err := core.New(core.Config{
-		WorkDir:     filepath.Join(".", "work"),
-		OutputDir:   outputDir,
-		Concurrency: 4,
+		WorkDir:    filepath.Join(".", "work"),
+		OutputDir:  outputDir,
+		DisableGPU: disableGPU,
 		OnStatus: func(u core.StatusUpdate) {
 			runtime.EventsEmit(a.ctx, "job:status", u)
 		},
@@ -74,6 +75,7 @@ func (a *App) service(outputDir string) (*core.Service, error) {
 	}
 	a.svc = svc
 	a.outputDir = outputDir
+	a.disableGPU = disableGPU
 	return svc, nil
 }
 
@@ -92,11 +94,12 @@ type StartJobOptions struct {
 	SubtitlePos  string `json:"subtitlePos"`
 	ExtraEffects bool   `json:"extraEffects"`
 	Flip         string `json:"flip"`
+	NoGPU        bool   `json:"noGPU"`
 }
 
 // StartJob submits a remix job with full options and returns its JobID.
 func (a *App) StartJob(o StartJobOptions) (string, error) {
-	svc, err := a.service(o.OutputDir)
+	svc, err := a.service(o.OutputDir, o.NoGPU)
 	if err != nil {
 		return "", fmt.Errorf("init core: %w", err)
 	}

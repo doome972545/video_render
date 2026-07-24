@@ -37,7 +37,7 @@ go build -o videoremix.exe ./cmd/videoremix
 | `--seed` | current time | Master seed; the same seed reproduces the same variant set |
 | `--workdir` | `work` | Working directory for downloads |
 | `--out` | `output` | Output directory for rendered videos |
-| `--gpu` | `false` | Prefer GPU (nvenc) encoding when available |
+| `--no-gpu` | `false` | Force CPU encoding (GPU is auto-detected and used by default) |
 | `--concurrency` | `4` | Max parallel renders |
 | `--music` | | Background music file to mix in (optional) |
 | `--music-volume` | `0.3` | Background music volume (0..1) |
@@ -57,7 +57,7 @@ go build -o videoremix.exe ./cmd/videoremix
 ./videoremix.exe --source "video.mp4" --variants 10 --seed 42
 
 # Download from YouTube, 50 variants, 8 parallel renders on GPU
-./videoremix.exe --source "https://youtube.com/watch?v=xxxx" --variants 50 --gpu --concurrency 8
+./videoremix.exe --source "https://youtube.com/watch?v=xxxx" --variants 50 --concurrency 8
 ```
 
 ## Development

@@ -17,6 +17,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"time"
 
@@ -36,8 +37,10 @@ type Config struct {
 	WorkDir string
 	// OutputDir is where rendered MP4s are written.
 	OutputDir string
-	// PreferGPU opportunistically uses GPU (nvenc) encoding when available.
+	// PreferGPU is deprecated; GPU is auto-detected and used by default.
 	PreferGPU bool
+	// DisableGPU forces CPU encoding even when a GPU encoder is available.
+	DisableGPU bool
 	// Concurrency is the max number of parallel renders.
 	Concurrency int
 	// RulesProvider optionally supplies a custom RuleSet + distribution. When
@@ -59,7 +62,16 @@ func (c *Config) applyDefaults() {
 		c.OutputDir = "output"
 	}
 	if c.Concurrency <= 0 {
-		c.Concurrency = 4
+		// Auto: GPU handles a few parallel encode sessions well; CPU renders
+		// are heavy, so cap at half the cores to keep the machine responsive.
+		if c.DisableGPU {
+			c.Concurrency = runtime.NumCPU() / 2
+			if c.Concurrency < 2 {
+				c.Concurrency = 2
+			}
+		} else {
+			c.Concurrency = 3
+		}
 	}
 	// RulesProvider stays nil by default so per-job RemixOptions are honored.
 }
@@ -166,7 +178,7 @@ func New(cfg Config) (*Service, error) {
 		render.NewGPUProbe(),
 		render.NewCLIFFmpegExecutor(),
 		render.NewFileOutputValidator(),
-		render.RenderConfig{PreferGPU: cfg.PreferGPU, Preset: "medium", OutputDir: cfg.OutputDir},
+		render.RenderConfig{DisableGPU: cfg.DisableGPU, OutputDir: cfg.OutputDir},
 		func(sourceRef string) (download.RawVideo, error) {
 			if capturedRaw.FilePath == "" {
 				return download.RawVideo{}, fmt.Errorf("source not resolved for ref %s", sourceRef)

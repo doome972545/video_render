@@ -20,7 +20,7 @@ func main() {
 		seed        = flag.Int64("seed", 0, "master seed for reproducibility (0 = time-based)")
 		workDir     = flag.String("workdir", "work", "working directory for downloads")
 		outDir      = flag.String("out", "output", "output directory for rendered videos")
-		gpu         = flag.Bool("gpu", false, "prefer GPU (nvenc) encoding when available")
+		noGPU       = flag.Bool("no-gpu", false, "force CPU encoding (GPU is auto-detected and used by default)")
 		concurrency = flag.Int("concurrency", 4, "max parallel renders")
 		music       = flag.String("music", "", "background music file to mix in (optional)")
 		musicVol    = flag.Float64("music-volume", 0.3, "background music volume (0..1)")
@@ -38,7 +38,7 @@ func main() {
 	svc, err := app.New(app.Config{
 		WorkDir:     *workDir,
 		OutputDir:   *outDir,
-		PreferGPU:   *gpu,
+		DisableGPU:  *noGPU,
 		Concurrency: *concurrency,
 		OnLog:       func(line string) { fmt.Println("  " + line) },
 	})
