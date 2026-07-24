@@ -27,6 +27,7 @@ func main() {
 		subtitle    = flag.String("subtitle", "", "caption text to burn into the video (optional)")
 		subPos      = flag.String("subtitle-pos", "bottom", "subtitle position: bottom|top|center")
 		extraFx     = flag.Bool("effects", false, "enable the wider random effect set (blur/zoom/hue/audio)")
+		flip        = flag.String("flip", "random", "horizontal flip: off|always|random")
 	)
 	flag.Parse()
 
@@ -58,6 +59,7 @@ func main() {
 			SubtitleText:     *subtitle,
 			SubtitlePosition: *subPos,
 			ExtraEffects:     *extraFx,
+			Flip:             *flip,
 		},
 	})
 	if err != nil {

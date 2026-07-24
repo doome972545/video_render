@@ -62,6 +62,15 @@ document.querySelector('#app').innerHTML = `
     </div>
 
     <div class="field">
+      <label>Flip horizontal (mirror)</label>
+      <select id="flip">
+        <option value="random">Random (≈50% of variants)</option>
+        <option value="always">Always (every variant)</option>
+        <option value="off">Off (never)</option>
+      </select>
+    </div>
+
+    <div class="field">
       <label>Subtitle text (optional)</label>
       <input id="subtitle" type="text" placeholder="Burned-in caption text" />
     </div>
@@ -163,6 +172,7 @@ $('start').addEventListener('click', async () => {
     subtitle: $('subtitle').value.trim(),
     subtitlePos: $('subPos').value,
     extraEffects: $('extraFx').checked,
+    flip: $('flip').value,
   };
 
   setBusy(true);
@@ -171,6 +181,7 @@ $('start').addEventListener('click', async () => {
   if (opts.musicPath) log(`  🎵 music: ${opts.musicPath} (vol ${opts.musicVolume})`);
   if (opts.subtitle) log(`  💬 subtitle: "${opts.subtitle}" (${opts.subtitlePos})`);
   if (opts.extraEffects) log(`  ✨ extra effects: on`);
+  if (opts.flip !== 'random') log(`  🔄 flip: ${opts.flip}`);
   log(`  output: ${opts.outputDir || './output'}`);
   try {
     currentJob = await StartJob(opts);

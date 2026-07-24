@@ -59,7 +59,19 @@ type RemixOptions struct {
 	// ExtraEffects enables the wider set of random effects (blur, zoom, hue,
 	// rotate, audio) on top of the base color/geometry set.
 	ExtraEffects bool
+
+	// Flip controls horizontal-flip behavior: "off", "always", or "random"
+	// (default). "off" never flips, "always" flips every variant, "random"
+	// flips roughly half of them.
+	Flip string
 }
+
+// Flip modes.
+const (
+	FlipOff    = "off"
+	FlipAlways = "always"
+	FlipRandom = "random"
+)
 
 // BuildRules constructs a RuleSet + distribution from RemixOptions.
 func BuildRules(o RemixOptions) (recipe.RuleSet, variant.DistributionRules) {
@@ -68,10 +80,21 @@ func BuildRules(o RemixOptions) (recipe.RuleSet, variant.DistributionRules) {
 		{EffectID: "contrast", Params: map[string]float64{"value": 1}, Hooks: map[string]recipe.Range{"value": {Min: 0.85, Max: 1.2}}},
 		{EffectID: "saturation", Params: map[string]float64{"value": 1}, Hooks: map[string]recipe.Range{"value": {Min: 0.8, Max: 1.3}}},
 		{EffectID: "speed", Params: map[string]float64{"factor": 1}, Hooks: map[string]recipe.Range{"factor": {Min: 0.95, Max: 1.1}}},
-		{EffectID: "hflip", Params: map[string]float64{}, Optional: true},
 	}
 	dist := variant.DistributionRules{
-		OptionalInclusion: map[string]float64{"hflip": 0.5},
+		OptionalInclusion: map[string]float64{},
+	}
+
+	// Horizontal flip mode.
+	switch o.Flip {
+	case FlipOff:
+		// Do not add hflip at all.
+	case FlipAlways:
+		// Mandatory flip on every variant.
+		base = append(base, recipe.EffectStep{EffectID: "hflip", Params: map[string]float64{}})
+	default: // FlipRandom / empty
+		base = append(base, recipe.EffectStep{EffectID: "hflip", Params: map[string]float64{}, Optional: true})
+		dist.OptionalInclusion["hflip"] = 0.5
 	}
 
 	if o.ExtraEffects {

@@ -44,6 +44,7 @@ go build -o videoremix.exe ./cmd/videoremix
 | `--subtitle` | | Caption text burned into the video (optional) |
 | `--subtitle-pos` | `bottom` | Subtitle position: `bottom`, `top`, `center` |
 | `--effects` | `false` | Enable the wider random effect set (blur/zoom/hue/audio) |
+| `--flip` | `random` | Horizontal flip (mirror): `off`, `always`, `random` |
 
 ```powershell
 # Add background music, a burned-in caption, and richer random effects

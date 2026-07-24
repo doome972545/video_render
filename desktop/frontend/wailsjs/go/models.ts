@@ -45,6 +45,7 @@ export namespace main {
 	    subtitle: string;
 	    subtitlePos: string;
 	    extraEffects: boolean;
+	    flip: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new StartJobOptions(source);
@@ -61,6 +62,7 @@ export namespace main {
 	        this.subtitle = source["subtitle"];
 	        this.subtitlePos = source["subtitlePos"];
 	        this.extraEffects = source["extraEffects"];
+	        this.flip = source["flip"];
 	    }
 	}
 
