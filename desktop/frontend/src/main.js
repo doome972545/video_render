@@ -77,6 +77,24 @@ document.querySelector('#app').innerHTML = `
 
     <div class="field checkbox-field">
       <label class="checkbox">
+        <input id="autoSub" type="checkbox" />
+        <span>Auto-subtitle from speech (Whisper) — local files only</span>
+      </label>
+    </div>
+
+    <div class="field">
+      <label>Auto-subtitle language</label>
+      <select id="subLang">
+        <option value="auto">Auto-detect</option>
+        <option value="en">English</option>
+        <option value="th">Thai</option>
+        <option value="ja">Japanese</option>
+        <option value="zh">Chinese</option>
+      </select>
+    </div>
+
+    <div class="field checkbox-field">
+      <label class="checkbox">
         <input id="extraFx" type="checkbox" checked />
         <span>Randomize extra effects (blur, zoom, hue, audio)</span>
       </label>
@@ -181,6 +199,8 @@ $('start').addEventListener('click', async () => {
     extraEffects: $('extraFx').checked,
     flip: $('flip').value,
     noGPU: $('noGPU').checked,
+    autoSubtitle: $('autoSub').checked,
+    subLang: $('subLang').value,
   };
 
   setBusy(true);
@@ -190,6 +210,7 @@ $('start').addEventListener('click', async () => {
   if (opts.subtitle) log(`  💬 subtitle: "${opts.subtitle}" (${opts.subtitlePos})`);
   if (opts.extraEffects) log(`  ✨ extra effects: on`);
   if (opts.flip !== 'random') log(`  🔄 flip: ${opts.flip}`);
+  if (opts.autoSubtitle) log(`  🎙 auto-subtitle: ${opts.subLang}`);
   log(`  output: ${opts.outputDir || './output'}`);
   try {
     currentJob = await StartJob(opts);

@@ -55,6 +55,13 @@ type RemixOptions struct {
 	// SubtitleText, when set, burns a caption into every output.
 	SubtitleText     string
 	SubtitlePosition string // "bottom" (default), "top", "center"
+	// SubtitleFile, when set, burns a timed .srt subtitle into every output.
+	// Set automatically by auto-subtitle (whisper) or manually.
+	SubtitleFile string
+	// AutoSubtitle transcribes the source speech into a .srt and burns it in.
+	AutoSubtitle bool
+	// SubtitleLang is the transcription language ("auto", "en", "th", ...).
+	SubtitleLang string
 
 	// ExtraEffects enables the wider set of random effects (blur, zoom, hue,
 	// rotate, audio) on top of the base color/geometry set.
@@ -137,11 +144,14 @@ func BuildRules(o RemixOptions) (recipe.RuleSet, variant.DistributionRules) {
 			Loop:         o.MusicLoop,
 		}
 	}
-	if o.SubtitleText != "" {
-		pos := o.SubtitlePosition
-		if pos == "" {
-			pos = "bottom"
-		}
+	pos := o.SubtitlePosition
+	if pos == "" {
+		pos = "bottom"
+	}
+	if o.SubtitleFile != "" {
+		// Timed .srt subtitle (from auto-subtitle or a provided file).
+		rules.BaseSubtitle = recipe.Subtitle{File: o.SubtitleFile, Position: pos}
+	} else if o.SubtitleText != "" {
 		rules.BaseSubtitle = recipe.Subtitle{Text: o.SubtitleText, Position: pos}
 	}
 

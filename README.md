@@ -45,6 +45,15 @@ go build -o videoremix.exe ./cmd/videoremix
 | `--subtitle-pos` | `bottom` | Subtitle position: `bottom`, `top`, `center` |
 | `--effects` | `false` | Enable the wider random effect set (blur/zoom/hue/audio) |
 | `--flip` | `random` | Horizontal flip (mirror): `off`, `always`, `random` |
+| `--auto-subtitle` | `false` | Transcribe source speech into burned-in subtitles (Whisper) |
+| `--sub-lang` | `auto` | Auto-subtitle language: `auto`, `en`, `th`, ... |
+
+**Auto-subtitle (Whisper):** transcribes speech from a local source file and
+burns timed captions into every variant. It uses ffmpeg's built-in whisper.cpp,
+so it needs a whisper model file. Point to one via the
+`VIDEOREMIX_WHISPER_MODEL` env var, or place `ggml-large-v3-turbo.bin` in a
+`whisper/` folder next to the executable. Download models from
+[ggerganov/whisper.cpp](https://huggingface.co/ggerganov/whisper.cpp).
 
 ```powershell
 # Add background music, a burned-in caption, and richer random effects

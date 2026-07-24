@@ -28,6 +28,8 @@ func main() {
 		subPos      = flag.String("subtitle-pos", "bottom", "subtitle position: bottom|top|center")
 		extraFx     = flag.Bool("effects", false, "enable the wider random effect set (blur/zoom/hue/audio)")
 		flip        = flag.String("flip", "random", "horizontal flip: off|always|random")
+		autoSub     = flag.Bool("auto-subtitle", false, "transcribe source speech into subtitles (needs whisper model)")
+		subLang     = flag.String("sub-lang", "auto", "auto-subtitle language: auto|en|th|...")
 	)
 	flag.Parse()
 
@@ -60,6 +62,8 @@ func main() {
 			SubtitlePosition: *subPos,
 			ExtraEffects:     *extraFx,
 			Flip:             *flip,
+			AutoSubtitle:     *autoSub,
+			SubtitleLang:     *subLang,
 		},
 	})
 	if err != nil {

@@ -46,6 +46,47 @@ func exeName(t Tool) string {
 	return string(t)
 }
 
+// WhisperModel locates a whisper.cpp model file for speech-to-text. Resolution
+// order:
+//  1. VIDEOREMIX_WHISPER_MODEL env var (explicit path).
+//  2. A "whisper" folder next to the executable (bundle mode).
+//  3. Known local install paths (e.g. the LM Studio models dir).
+//
+// It returns the first existing model file, or "" if none is found. The model
+// is intentionally not embedded (it is ~1.5 GB); it is resolved at runtime.
+func WhisperModel() string {
+	if p := os.Getenv("VIDEOREMIX_WHISPER_MODEL"); p != "" {
+		if fileExists(p) {
+			return p
+		}
+	}
+	var candidates []string
+	if exe, err := os.Executable(); err == nil {
+		dir := filepath.Dir(exe)
+		candidates = append(candidates,
+			filepath.Join(dir, "whisper", "ggml-large-v3-turbo.bin"),
+			filepath.Join(dir, "whisper", "ggml-base.bin"),
+		)
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		candidates = append(candidates,
+			filepath.Join(home, ".lmstudio", "models", "whisper-cpp", "ggml-large-v3-turbo.bin"),
+			filepath.Join(home, ".cache", "whisper", "ggml-large-v3-turbo.bin"),
+		)
+	}
+	for _, c := range candidates {
+		if fileExists(c) {
+			return c
+		}
+	}
+	return ""
+}
+
+func fileExists(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && !fi.IsDir()
+}
+
 // Resolver locates tool executables and caches the resolved paths.
 type Resolver struct {
 	mu       sync.Mutex

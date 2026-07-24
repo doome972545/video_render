@@ -95,6 +95,8 @@ type StartJobOptions struct {
 	ExtraEffects bool   `json:"extraEffects"`
 	Flip         string `json:"flip"`
 	NoGPU        bool   `json:"noGPU"`
+	AutoSubtitle bool   `json:"autoSubtitle"`
+	SubLang      string `json:"subLang"`
 }
 
 // StartJob submits a remix job with full options and returns its JobID.
@@ -115,6 +117,8 @@ func (a *App) StartJob(o StartJobOptions) (string, error) {
 			SubtitlePosition: o.SubtitlePos,
 			ExtraEffects:     o.ExtraEffects,
 			Flip:             o.Flip,
+			AutoSubtitle:     o.AutoSubtitle,
+			SubtitleLang:     o.SubLang,
 		},
 	})
 	return string(id), err

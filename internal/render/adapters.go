@@ -196,8 +196,22 @@ func (c *ChainCompiler) Compile(t Timeline, steps []recipe.EffectStep) (FilterGr
 	}, nil
 }
 
-// subtitleFilter builds a drawtext filter for a burned-in caption, or "".
+// subtitleFilter builds an ffmpeg video filter for a burned-in caption, or "".
+// When a .srt File is set it uses the subtitles filter (timed captions);
+// otherwise it uses drawtext for a static caption.
 func subtitleFilter(s recipe.Subtitle) string {
+	// Timed subtitles from an .srt file take precedence.
+	if f := strings.TrimSpace(s.File); f != "" {
+		size := s.FontSize
+		if size <= 0 {
+			size = 20
+		}
+		// force_style needs the subtitles filter (libass). Escape the path.
+		return fmt.Sprintf(
+			"subtitles='%s':force_style='FontSize=%d,Outline=2,Shadow=1,BorderStyle=1'",
+			escapeFilterPath(f), size,
+		)
+	}
 	if strings.TrimSpace(s.Text) == "" {
 		return ""
 	}

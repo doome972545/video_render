@@ -47,6 +47,8 @@ export namespace main {
 	    extraEffects: boolean;
 	    flip: string;
 	    noGPU: boolean;
+	    autoSubtitle: boolean;
+	    subLang: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new StartJobOptions(source);
@@ -65,6 +67,8 @@ export namespace main {
 	        this.extraEffects = source["extraEffects"];
 	        this.flip = source["flip"];
 	        this.noGPU = source["noGPU"];
+	        this.autoSubtitle = source["autoSubtitle"];
+	        this.subLang = source["subLang"];
 	    }
 	}
 

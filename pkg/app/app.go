@@ -17,7 +17,10 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -194,6 +197,20 @@ func New(cfg Config) (*Service, error) {
 	return s, nil
 }
 
+// autoSubtitle transcribes a local source file's speech into an .srt in WorkDir.
+func (s *Service) autoSubtitle(source, lang string) (string, error) {
+	if fi, err := os.Stat(source); err != nil || fi.IsDir() {
+		return "", fmt.Errorf("auto-subtitle needs a local file (got %q)", source)
+	}
+	tr := render.NewTranscriber("")
+	if !tr.Available() {
+		return "", fmt.Errorf("no whisper model (set VIDEOREMIX_WHISPER_MODEL)")
+	}
+	base := filepath.Base(source)
+	srt := filepath.Join(s.cfg.WorkDir, strings.TrimSuffix(base, filepath.Ext(base))+".srt")
+	return tr.Transcribe(source, srt, lang)
+}
+
 // StartJob submits a remix job and returns immediately with a JobID. Rendering
 // proceeds asynchronously; observe progress via Config.OnStatus, Status, or
 // WaitForJob.
@@ -203,6 +220,22 @@ func (s *Service) StartJob(req JobRequest) (JobID, error) {
 	}
 	if req.Seed == 0 {
 		req.Seed = time.Now().UnixNano()
+	}
+
+	// Auto-subtitle: transcribe the source's speech into an .srt before the
+	// pipeline runs. Only supported for local source files (URLs are fetched
+	// inside the pipeline). The generated .srt is burned into every variant.
+	if req.Options.AutoSubtitle && req.Options.SubtitleFile == "" {
+		if srt, err := s.autoSubtitle(req.Source, req.Options.SubtitleLang); err != nil {
+			if s.cfg.OnLog != nil {
+				s.cfg.OnLog("auto-subtitle skipped: " + err.Error())
+			}
+		} else {
+			req.Options.SubtitleFile = srt
+			if s.cfg.OnLog != nil {
+				s.cfg.OnLog("auto-subtitle: transcribed to " + srt)
+			}
+		}
 	}
 
 	// Record this job's remix options for buildStages.

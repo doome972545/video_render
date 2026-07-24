@@ -79,6 +79,9 @@ type AudioTrack struct {
 type Subtitle struct {
 	// Text is the literal caption to burn in. Empty means "no subtitle".
 	Text string `json:"text,omitempty"`
+	// File is a path to a .srt subtitle file to burn in (with timestamps). When
+	// set, it takes precedence over Text. Used for auto-generated captions.
+	File string `json:"file,omitempty"`
 	// FontSize in pixels. 0 = default (24).
 	FontSize int `json:"font_size,omitempty"`
 	// Color is an ffmpeg color name/hex (e.g. "white", "yellow"). Empty=white.
