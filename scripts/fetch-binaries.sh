@@ -25,36 +25,36 @@ fetch_ytdlp() {
     *) echo "unsupported OS for yt-dlp: $OS"; return 1 ;;
   esac
   echo "  yt-dlp <- $url"
-  curl -fsSL "$url" -o "$EMBED/yt-dlp"
+  curl -fL --retry 5 --retry-all-errors -s "$url" -o "$EMBED/yt-dlp"
   chmod +x "$EMBED/yt-dlp"
 }
 
 fetch_ffmpeg_linux() {
-  # johnvansickle static builds (amd64/arm64).
+  # BtbN/FFmpeg-Builds on GitHub — reliable release assets (amd64/arm64).
   local a
   case "$ARCH" in
-    x86_64|amd64) a="amd64" ;;
-    aarch64|arm64) a="arm64" ;;
+    x86_64|amd64) a="linux64" ;;
+    aarch64|arm64) a="linuxarm64" ;;
     *) echo "unsupported Linux arch: $ARCH"; return 1 ;;
   esac
-  local url="https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-${a}-static.tar.xz"
+  local url="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-${a}-gpl.tar.xz"
   echo "  ffmpeg/ffprobe <- $url"
-  curl -fsSL "$url" -o "$TMP/ff.tar.xz"
+  curl -fL --retry 5 --retry-all-errors -s "$url" -o "$TMP/ff.tar.xz"
   tar -xJf "$TMP/ff.tar.xz" -C "$TMP"
   local dir
-  dir="$(find "$TMP" -maxdepth 1 -type d -name 'ffmpeg-*-static' | head -n1)"
-  cp "$dir/ffmpeg" "$EMBED/ffmpeg"
-  cp "$dir/ffprobe" "$EMBED/ffprobe"
+  dir="$(find "$TMP" -maxdepth 1 -type d -name 'ffmpeg-*' | head -n1)"
+  cp "$dir/bin/ffmpeg" "$EMBED/ffmpeg"
+  cp "$dir/bin/ffprobe" "$EMBED/ffprobe"
   chmod +x "$EMBED/ffmpeg" "$EMBED/ffprobe"
 }
 
 fetch_ffmpeg_macos() {
   # evermeet.cx provides notarized static ffmpeg/ffprobe (universal/x86_64).
   echo "  ffmpeg  <- evermeet.cx"
-  curl -fsSL "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip" -o "$TMP/ffmpeg.zip"
+  curl -fL --retry 5 --retry-all-errors -s "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip" -o "$TMP/ffmpeg.zip"
   unzip -o -q "$TMP/ffmpeg.zip" -d "$EMBED"
   echo "  ffprobe <- evermeet.cx"
-  curl -fsSL "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o "$TMP/ffprobe.zip"
+  curl -fL --retry 5 --retry-all-errors -s "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o "$TMP/ffprobe.zip"
   unzip -o -q "$TMP/ffprobe.zip" -d "$EMBED"
   chmod +x "$EMBED/ffmpeg" "$EMBED/ffprobe"
 }
