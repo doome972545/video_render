@@ -11,6 +11,8 @@
 /desktop/build/bin/
 /desktop/frontend/node_modules/
 /desktop/frontend/dist/
+/desktop/work/
+/desktop/output/
 
 # Embedded third-party binaries (large; fetched/installed separately).
 # Ignore everything in embedded/ EXCEPT the committed placeholder/readme, so the

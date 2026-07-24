@@ -10,4 +10,6 @@ export function OpenOutputDir():Promise<void>;
 
 export function PickFile():Promise<string>;
 
-export function StartJob(arg1:string,arg2:number,arg3:number):Promise<string>;
+export function PickOutputDir():Promise<string>;
+
+export function StartJob(arg1:string,arg2:number,arg3:number,arg4:string):Promise<string>;

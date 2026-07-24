@@ -18,6 +18,10 @@ export function PickFile() {
   return window['go']['main']['App']['PickFile']();
 }
 
-export function StartJob(arg1, arg2, arg3) {
-  return window['go']['main']['App']['StartJob'](arg1, arg2, arg3);
+export function PickOutputDir() {
+  return window['go']['main']['App']['PickOutputDir']();
+}
+
+export function StartJob(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['StartJob'](arg1, arg2, arg3, arg4);
 }

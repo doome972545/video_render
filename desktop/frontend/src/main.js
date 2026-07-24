@@ -1,7 +1,7 @@
 import './style.css';
 import './app.css';
 
-import { StartJob, GetStatus, CancelJob, PickFile, OpenOutputDir } from '../wailsjs/go/main/App';
+import { StartJob, GetStatus, CancelJob, PickFile, PickOutputDir, OpenOutputDir } from '../wailsjs/go/main/App';
 import { EventsOn } from '../wailsjs/runtime/runtime';
 
 document.querySelector('#app').innerHTML = `
@@ -14,6 +14,14 @@ document.querySelector('#app').innerHTML = `
       <div class="row">
         <input id="source" type="text" placeholder="https://youtube.com/... or C:\\path\\video.mp4" />
         <button class="btn ghost" id="pick">Browse…</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Output folder</label>
+      <div class="row">
+        <input id="output" type="text" placeholder="Default: ./output" />
+        <button class="btn ghost" id="pickOut">Browse…</button>
       </div>
     </div>
 
@@ -90,17 +98,26 @@ $('pick').addEventListener('click', async () => {
   } catch (e) { log('pick error: ' + e); }
 });
 
+$('pickOut').addEventListener('click', async () => {
+  try {
+    const dir = await PickOutputDir();
+    if (dir) $('output').value = dir;
+  } catch (e) { log('pick output error: ' + e); }
+});
+
 $('start').addEventListener('click', async () => {
   const source = $('source').value.trim();
   if (!source) { log('⚠ Please provide a source URL or file.'); return; }
   const variants = parseInt($('variants').value || '1', 10);
   const seed = parseInt($('seed').value || '0', 10);
+  const output = $('output').value.trim();
 
   setBusy(true);
   $('log').textContent = '';
   log(`▶ Starting: ${source} (variants=${variants}, seed=${seed})`);
+  log(`  output: ${output || './output'}`);
   try {
-    currentJob = await StartJob(source, variants, seed);
+    currentJob = await StartJob(source, variants, seed, output);
     log('Job: ' + currentJob);
   } catch (e) {
     log('start error: ' + e);
