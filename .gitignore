@@ -1,0 +1,15 @@
+# Build output
+/videoremix.exe
+/videoremix
+*.exe
+
+# Working/output dirs
+/work/
+/output/
+
+# Embedded third-party binaries (large; fetched/installed separately).
+# Ignore everything in embedded/ EXCEPT the committed placeholder/readme, so the
+# directory still exists on a fresh clone (required by //go:embed embedded/*).
+/internal/binaries/embedded/*
+!/internal/binaries/embedded/.gitkeep
+!/internal/binaries/embedded/README.txt
