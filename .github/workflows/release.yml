@@ -20,15 +20,15 @@ jobs:
         include:
           - os: windows-latest
             name: windows
-            cli_out: videoremix-windows-amd64.exe
+            cli_out: videoremix-cli-windows-amd64.exe
             desktop_ext: .exe
           - os: macos-latest
             name: macos
-            cli_out: videoremix-macos-arm64
+            cli_out: videoremix-cli-macos-arm64
             desktop_ext: .app
           - os: ubuntu-22.04
             name: linux
-            cli_out: videoremix-linux-amd64
+            cli_out: videoremix-cli-linux-amd64
             desktop_ext: ""
 
     runs-on: ${{ matrix.os }}
