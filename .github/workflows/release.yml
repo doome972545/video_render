@@ -1,0 +1,125 @@
+name: Build & Release
+
+# Trigger a full cross-OS build by pushing a version tag, e.g.:
+#   git tag v1.0.0 && git push origin v1.0.0
+# You can also run it manually from the Actions tab (workflow_dispatch).
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write # needed to create a Release and upload assets
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+            cli_out: videoremix-windows-amd64.exe
+            desktop_ext: .exe
+          - os: macos-latest
+            name: macos
+            cli_out: videoremix-macos-arm64
+            desktop_ext: .app
+          - os: ubuntu-latest
+            name: linux
+            cli_out: videoremix-linux-amd64
+            desktop_ext: ""
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # --- Linux system deps for Wails (WebKit/GTK) ---
+      - name: Install Linux deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      # --- Fetch OS-specific ffmpeg/ffprobe/yt-dlp into embedded/ ---
+      - name: Fetch binaries (Unix)
+        if: matrix.os != 'windows-latest'
+        run: bash scripts/fetch-binaries.sh
+
+      - name: Fetch binaries (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: ./scripts/fetch-binaries.ps1
+
+      # --- Build the CLI (portable, embedded) ---
+      - name: Build CLI
+        shell: bash
+        run: |
+          go build -tags embed_binaries -o "dist/${{ matrix.cli_out }}" ./cmd/videoremix
+
+      # --- Install Wails CLI and build the desktop app ---
+      - name: Install Wails
+        shell: bash
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+
+      - name: Build desktop app
+        shell: bash
+        working-directory: desktop
+        run: |
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          wails build -tags embed_binaries
+
+      # --- Package the desktop app per OS ---
+      - name: Package desktop (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          cp desktop/build/bin/VideoRemix.exe "dist/VideoRemix-windows-amd64.exe"
+
+      - name: Package desktop (macOS)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          cd desktop/build/bin
+          zip -r -q "../../../dist/VideoRemix-macos.app.zip" *.app
+
+      - name: Package desktop (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          cp desktop/build/bin/VideoRemix "dist/VideoRemix-linux-amd64"
+          chmod +x "dist/VideoRemix-linux-amd64"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: videoremix-${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true

@@ -2,6 +2,7 @@
 /videoremix.exe
 /videoremix
 *.exe
+/dist/
 
 # Working/output dirs
 /work/
