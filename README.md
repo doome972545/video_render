@@ -74,10 +74,23 @@ internal/
 scripts/      helper scripts (build.ps1, fetch-binaries.ps1)
 ```
 
-> To embed this pipeline into a **Wails desktop app**, an HTTP server, or any
-> other Go program, import `videoremix/pkg/app`. See **[INTEGRATION.md](INTEGRATION.md)**
-> for a complete Wails example that ships ffmpeg embedded so end users install
-> nothing.
+> A ready-to-run **Wails desktop app** lives in [`desktop/`](desktop/). It imports
+> `videoremix/pkg/app` and ships ffmpeg embedded so end users install nothing.
+> See **[INTEGRATION.md](INTEGRATION.md)** for how it's wired and how to embed the
+> core into your own Wails/HTTP app.
+
+### Desktop app (Wails)
+
+```powershell
+cd desktop
+wails dev                          # live-reload during development
+wails build -tags embed_binaries   # self-contained desktop .exe (~490 MB)
+# output: desktop/build/bin/desktop.exe
+```
+
+Requires the [Wails CLI](https://wails.io) and Node.js. Run
+`scripts/fetch-binaries.ps1` once before an embedded build so the tools are
+present.
 
 ### Common tasks
 

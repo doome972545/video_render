@@ -69,18 +69,33 @@ svc, _ := app.New(app.Config{
 
 ## Using it from a Wails desktop app
 
-Wails apps are just Go programs with a web UI. You bind a Go struct's methods to
-JavaScript, and the core drops straight in. **The core is imported as a package
-— you do not "merge" the two projects.**
+A **working Wails desktop app already lives in `desktop/`** in this repo. It
+imports `videoremix/pkg/app`, binds it to a small web UI, and streams progress
+via Wails events. Use it as-is or as a reference. The sections below explain how
+it's wired.
 
-### 1. Scaffold a Wails app (separate module or same module)
+Run it:
 
-```bash
-wails init -n videoremix-desktop -t vanilla   # or react/vue/svelte
+```powershell
+cd desktop
+wails dev                          # live-reload dev mode
+wails build -tags embed_binaries   # produce a self-contained desktop .exe
 ```
 
-If you keep it in the same repo, add the app under e.g. `desktop/` and let it
-import `videoremix/pkg/app` (they share the same Go module `videoremix`).
+The built app lands in `desktop/build/bin/desktop.exe`. With the embed tag it is
+~490 MB and needs nothing installed on the user's machine.
+
+### 1. How the desktop module imports the core
+
+`desktop/` is its own Go module that points back at the core via a replace
+directive in `desktop/go.mod`:
+
+```
+require videoremix v0.0.0
+replace videoremix => ../
+```
+
+That's all it takes to reuse the entire pipeline — no code is duplicated.
 
 ### 2. Bind the core in `app.go`
 

@@ -7,6 +7,11 @@
 /work/
 /output/
 
+# Wails desktop build artifacts
+/desktop/build/bin/
+/desktop/frontend/node_modules/
+/desktop/frontend/dist/
+
 # Embedded third-party binaries (large; fetched/installed separately).
 # Ignore everything in embedded/ EXCEPT the committed placeholder/readme, so the
 # directory still exists on a fresh clone (required by //go:embed embedded/*).
