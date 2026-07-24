@@ -126,15 +126,27 @@ jobs:
       - name: List artifacts
         run: find artifacts -type f
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release (empty)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${GITHUB_REF_NAME}"
-          # Flatten all downloaded artifact files for upload.
-          mkdir -p upload
-          find artifacts -type f -exec cp {} upload/ \;
-          gh release create "$TAG" upload/* \
+          # Create the release first (delete any partial one from a failed run).
+          gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag=false 2>/dev/null || true
+          gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --title "$TAG" \
             --generate-notes
+
+      - name: Upload assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          # Upload each artifact file individually with --clobber so a re-run or
+          # any duplicate name overwrites instead of failing. Filenames are
+          # already unique per OS, so we keep them as-is.
+          find artifacts -type f | while read -r f; do
+            echo "uploading $(basename "$f")"
+            gh release upload "$TAG" "$f" --repo "$GITHUB_REPOSITORY" --clobber
+          done
