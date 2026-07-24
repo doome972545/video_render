@@ -1,7 +1,7 @@
 import './style.css';
 import './app.css';
 
-import { StartJob, GetStatus, CancelJob, PickFile, PickOutputDir, OpenOutputDir } from '../wailsjs/go/main/App';
+import { StartJob, GetStatus, CancelJob, PickFile, PickMusic, PickOutputDir, OpenOutputDir } from '../wailsjs/go/main/App';
 import { EventsOn } from '../wailsjs/runtime/runtime';
 
 document.querySelector('#app').innerHTML = `
@@ -34,6 +34,43 @@ document.querySelector('#app').innerHTML = `
         <label>Seed (0 = random)</label>
         <input id="seed" type="number" value="0" />
       </div>
+    </div>
+
+    <div class="section-title">Editing options</div>
+
+    <div class="field">
+      <label>Background music (optional)</label>
+      <div class="row">
+        <input id="music" type="text" placeholder="No music" />
+        <button class="btn ghost" id="pickMusic">Browse…</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="field">
+        <label>Music volume (0–1)</label>
+        <input id="musicVol" type="number" min="0" max="1" step="0.05" value="0.3" />
+      </div>
+      <div class="field">
+        <label>Subtitle position</label>
+        <select id="subPos">
+          <option value="bottom">Bottom</option>
+          <option value="top">Top</option>
+          <option value="center">Center</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Subtitle text (optional)</label>
+      <input id="subtitle" type="text" placeholder="Burned-in caption text" />
+    </div>
+
+    <div class="field checkbox-field">
+      <label class="checkbox">
+        <input id="extraFx" type="checkbox" checked />
+        <span>Randomize extra effects (blur, zoom, hue, audio)</span>
+      </label>
     </div>
 
     <div class="row actions">
@@ -105,19 +142,38 @@ $('pickOut').addEventListener('click', async () => {
   } catch (e) { log('pick output error: ' + e); }
 });
 
+$('pickMusic').addEventListener('click', async () => {
+  try {
+    const path = await PickMusic();
+    if (path) $('music').value = path;
+  } catch (e) { log('pick music error: ' + e); }
+});
+
 $('start').addEventListener('click', async () => {
   const source = $('source').value.trim();
   if (!source) { log('⚠ Please provide a source URL or file.'); return; }
-  const variants = parseInt($('variants').value || '1', 10);
-  const seed = parseInt($('seed').value || '0', 10);
-  const output = $('output').value.trim();
+
+  const opts = {
+    source,
+    variants: parseInt($('variants').value || '1', 10),
+    seed: parseInt($('seed').value || '0', 10),
+    outputDir: $('output').value.trim(),
+    musicPath: $('music').value.trim(),
+    musicVolume: parseFloat($('musicVol').value || '0.3'),
+    subtitle: $('subtitle').value.trim(),
+    subtitlePos: $('subPos').value,
+    extraEffects: $('extraFx').checked,
+  };
 
   setBusy(true);
   $('log').textContent = '';
-  log(`▶ Starting: ${source} (variants=${variants}, seed=${seed})`);
-  log(`  output: ${output || './output'}`);
+  log(`▶ Starting: ${source} (variants=${opts.variants}, seed=${opts.seed})`);
+  if (opts.musicPath) log(`  🎵 music: ${opts.musicPath} (vol ${opts.musicVolume})`);
+  if (opts.subtitle) log(`  💬 subtitle: "${opts.subtitle}" (${opts.subtitlePos})`);
+  if (opts.extraEffects) log(`  ✨ extra effects: on`);
+  log(`  output: ${opts.outputDir || './output'}`);
   try {
-    currentJob = await StartJob(source, variants, seed, output);
+    currentJob = await StartJob(opts);
     log('Job: ' + currentJob);
   } catch (e) {
     log('start error: ' + e);

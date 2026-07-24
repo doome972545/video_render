@@ -101,6 +101,8 @@ func (RuleBasedGenerator) Generate(a analyze.AnalysisResult, rules RuleSet, seed
 		SourceRef:     string(a.Fingerprint),
 		Segments:      []Segment{seg},
 		EffectSteps:   steps,
+		Audio:         rules.BaseAudio,
+		Subtitle:      rules.BaseSubtitle,
 		Constraint:    rules.Constraint,
 		Seed:          seed,
 		Status:        StatusDraft,

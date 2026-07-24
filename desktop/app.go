@@ -79,18 +79,38 @@ func (a *App) service(outputDir string) (*core.Service, error) {
 
 // --- Methods exposed to the frontend ---
 
-// StartJob submits a remix job (rendering into outputDir) and returns its
-// JobID. When outputDir is empty, "./output" is used.
-func (a *App) StartJob(source string, variants int, seed int64, outputDir string) (string, error) {
-	svc, err := a.service(outputDir)
+// StartJobOptions carries all remix parameters from the frontend in one object
+// (Wails binds this as a JS object), keeping the method signature stable.
+type StartJobOptions struct {
+	Source       string `json:"source"`
+	Variants     int    `json:"variants"`
+	Seed         int64  `json:"seed"`
+	OutputDir    string `json:"outputDir"`
+	MusicPath    string `json:"musicPath"`
+	MusicVolume  float64 `json:"musicVolume"`
+	Subtitle     string `json:"subtitle"`
+	SubtitlePos  string `json:"subtitlePos"`
+	ExtraEffects bool   `json:"extraEffects"`
+}
+
+// StartJob submits a remix job with full options and returns its JobID.
+func (a *App) StartJob(o StartJobOptions) (string, error) {
+	svc, err := a.service(o.OutputDir)
 	if err != nil {
 		return "", fmt.Errorf("init core: %w", err)
 	}
 	id, err := svc.StartJob(core.JobRequest{
-		Source:       source,
-		VariantCount: variants,
-		Seed:         seed,
+		Source:       o.Source,
+		VariantCount: o.Variants,
+		Seed:         o.Seed,
 		Priority:     core.PriorityNormal,
+		Options: core.RemixOptions{
+			MusicPath:        o.MusicPath,
+			MusicVolume:      o.MusicVolume,
+			SubtitleText:     o.Subtitle,
+			SubtitlePosition: o.SubtitlePos,
+			ExtraEffects:     o.ExtraEffects,
+		},
 	})
 	return string(id), err
 }
@@ -123,6 +143,17 @@ func (a *App) PickFile() (string, error) {
 		Title: "Select a video file",
 		Filters: []runtime.FileFilter{
 			{DisplayName: "Videos", Pattern: "*.mp4;*.mkv;*.mov;*.webm;*.avi"},
+			{DisplayName: "All files", Pattern: "*.*"},
+		},
+	})
+}
+
+// PickMusic opens a native file dialog for choosing a background music file.
+func (a *App) PickMusic() (string, error) {
+	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Select a music file",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Audio", Pattern: "*.mp3;*.m4a;*.aac;*.wav;*.ogg;*.flac"},
 			{DisplayName: "All files", Pattern: "*.*"},
 		},
 	})

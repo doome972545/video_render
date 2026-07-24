@@ -33,3 +33,36 @@ export namespace app {
 
 }
 
+export namespace main {
+	
+	export class StartJobOptions {
+	    source: string;
+	    variants: number;
+	    seed: number;
+	    outputDir: string;
+	    musicPath: string;
+	    musicVolume: number;
+	    subtitle: string;
+	    subtitlePos: string;
+	    extraEffects: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new StartJobOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.source = source["source"];
+	        this.variants = source["variants"];
+	        this.seed = source["seed"];
+	        this.outputDir = source["outputDir"];
+	        this.musicPath = source["musicPath"];
+	        this.musicVolume = source["musicVolume"];
+	        this.subtitle = source["subtitle"];
+	        this.subtitlePos = source["subtitlePos"];
+	        this.extraEffects = source["extraEffects"];
+	    }
+	}
+
+}
+

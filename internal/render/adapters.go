@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -31,54 +32,115 @@ func resolve(t binaries.Tool) string {
 	return string(t)
 }
 
-// EffectStepToGraph maps a single EffectStep to an FFmpeg filter fragment. New
-// effects register their mapping here without modifying the compiler loop.
+// EffectKind classifies whether an effect applies to the video or audio chain.
+type EffectKind int
+
+const (
+	KindVideo EffectKind = iota
+	KindAudio
+)
+
+// EffectDef defines how one effect ID compiles to an FFmpeg filter fragment,
+// and which chain (video/audio) it belongs to.
+type EffectDef struct {
+	Kind    EffectKind
+	Compile func(step recipe.EffectStep) (string, error)
+}
+
+// EffectStepToGraph is kept for backward compatibility (video-only mapper).
 type EffectStepToGraph func(step recipe.EffectStep) (string, error)
 
-// DefaultEffectRegistry provides mappings for a small built-in effect set.
-func DefaultEffectRegistry() map[string]EffectStepToGraph {
-	return map[string]EffectStepToGraph{
-		"brightness": func(s recipe.EffectStep) (string, error) {
+// DefaultEffectRegistry provides mappings for the built-in effect set, covering
+// both video (-vf) and audio (-af) effects. Add new effects here without
+// touching the compiler loop.
+func DefaultEffectRegistry() map[string]EffectDef {
+	return map[string]EffectDef{
+		// --- Video effects ---
+		"brightness": {KindVideo, func(s recipe.EffectStep) (string, error) {
 			return fmt.Sprintf("eq=brightness=%.3f", s.Params["value"]), nil
-		},
-		"contrast": func(s recipe.EffectStep) (string, error) {
-			v := s.Params["value"]
-			if v == 0 {
-				v = 1
-			}
+		}},
+		"contrast": {KindVideo, func(s recipe.EffectStep) (string, error) {
+			v := def(s.Params["value"], 1)
 			return fmt.Sprintf("eq=contrast=%.3f", v), nil
-		},
-		"saturation": func(s recipe.EffectStep) (string, error) {
-			v := s.Params["value"]
-			if v == 0 {
-				v = 1
-			}
+		}},
+		"saturation": {KindVideo, func(s recipe.EffectStep) (string, error) {
+			v := def(s.Params["value"], 1)
 			return fmt.Sprintf("eq=saturation=%.3f", v), nil
-		},
-		"hflip": func(s recipe.EffectStep) (string, error) {
+		}},
+		"gamma": {KindVideo, func(s recipe.EffectStep) (string, error) {
+			return fmt.Sprintf("eq=gamma=%.3f", def(s.Params["value"], 1)), nil
+		}},
+		"hflip": {KindVideo, func(s recipe.EffectStep) (string, error) {
 			return "hflip", nil
-		},
-		"speed": func(s recipe.EffectStep) (string, error) {
-			factor := s.Params["factor"]
-			if factor <= 0 {
-				factor = 1
-			}
-			// setpts is 1/factor for video speed.
+		}},
+		"speed": {KindVideo, func(s recipe.EffectStep) (string, error) {
+			factor := def(s.Params["factor"], 1)
 			return fmt.Sprintf("setpts=%.4f*PTS", 1.0/factor), nil
-		},
-		"scale": func(s recipe.EffectStep) (string, error) {
+		}},
+		"scale": {KindVideo, func(s recipe.EffectStep) (string, error) {
 			w := int(s.Params["width"])
 			h := int(s.Params["height"])
 			if w <= 0 || h <= 0 {
 				return "scale=iw:ih", nil
 			}
 			return fmt.Sprintf("scale=%d:%d", w, h), nil
-		},
-		"crop": func(s recipe.EffectStep) (string, error) {
+		}},
+		"crop": {KindVideo, func(s recipe.EffectStep) (string, error) {
 			return fmt.Sprintf("crop=iw*%.3f:ih*%.3f",
 				clamp01default(s.Params["w"], 1), clamp01default(s.Params["h"], 1)), nil
-		},
+		}},
+		"blur": {KindVideo, func(s recipe.EffectStep) (string, error) {
+			return fmt.Sprintf("boxblur=%.2f", def(s.Params["radius"], 2)), nil
+		}},
+		"sharpen": {KindVideo, func(s recipe.EffectStep) (string, error) {
+			return fmt.Sprintf("unsharp=5:5:%.2f", def(s.Params["amount"], 1)), nil
+		}},
+		"rotate": {KindVideo, func(s recipe.EffectStep) (string, error) {
+			// degrees -> radians
+			return fmt.Sprintf("rotate=%.4f*PI/180", s.Params["degrees"]), nil
+		}},
+		"vignette": {KindVideo, func(s recipe.EffectStep) (string, error) {
+			return "vignette", nil
+		}},
+		"hue": {KindVideo, func(s recipe.EffectStep) (string, error) {
+			return fmt.Sprintf("hue=h=%.1f", s.Params["degrees"]), nil
+		}},
+		"zoom": {KindVideo, func(s recipe.EffectStep) (string, error) {
+			z := def(s.Params["factor"], 1.1)
+			// Scale up then center-crop back to original size = a static zoom.
+			return fmt.Sprintf("scale=iw*%.3f:ih*%.3f,crop=iw/%.3f:ih/%.3f", z, z, z, z), nil
+		}},
+
+		// --- Audio effects ---
+		"volume": {KindAudio, func(s recipe.EffectStep) (string, error) {
+			return fmt.Sprintf("volume=%.3f", def(s.Params["value"], 1)), nil
+		}},
+		"afade_in": {KindAudio, func(s recipe.EffectStep) (string, error) {
+			return fmt.Sprintf("afade=t=in:st=0:d=%.2f", def(s.Params["duration"], 1)), nil
+		}},
+		"bass": {KindAudio, func(s recipe.EffectStep) (string, error) {
+			return fmt.Sprintf("bass=g=%.1f", s.Params["gain"]), nil
+		}},
+		"treble": {KindAudio, func(s recipe.EffectStep) (string, error) {
+			return fmt.Sprintf("treble=g=%.1f", s.Params["gain"]), nil
+		}},
+		"pitch": {KindAudio, func(s recipe.EffectStep) (string, error) {
+			// asetrate trick: multiply sample rate then resample back.
+			f := def(s.Params["factor"], 1)
+			return fmt.Sprintf("asetrate=44100*%.4f,aresample=44100,atempo=%.4f", f, 1.0/f), nil
+		}},
+		"echo": {KindAudio, func(s recipe.EffectStep) (string, error) {
+			return "aecho=0.8:0.9:1000:0.3", nil
+		}},
 	}
+}
+
+// def returns v when non-zero, otherwise the fallback.
+func def(v, fallback float64) float64 {
+	if v == 0 {
+		return fallback
+	}
+	return v
 }
 
 func clamp01default(v, def float64) float64 {
@@ -88,12 +150,13 @@ func clamp01default(v, def float64) float64 {
 	return v
 }
 
-// ChainCompiler converts ordered effect steps into a single video filter chain.
+// ChainCompiler converts ordered effect steps into separate video/audio filter
+// chains, and appends a subtitle drawtext filter to the video chain.
 type ChainCompiler struct {
-	registry map[string]EffectStepToGraph
+	registry map[string]EffectDef
 }
 
-func NewChainCompiler(registry map[string]EffectStepToGraph) *ChainCompiler {
+func NewChainCompiler(registry map[string]EffectDef) *ChainCompiler {
 	return &ChainCompiler{registry: registry}
 }
 
@@ -101,22 +164,125 @@ func (c *ChainCompiler) Compile(t Timeline, steps []recipe.EffectStep) (FilterGr
 	ordered := append([]recipe.EffectStep(nil), steps...)
 	sort.SliceStable(ordered, func(i, j int) bool { return ordered[i].Order < ordered[j].Order })
 
-	fragments := make([]string, 0, len(ordered))
+	var video, audio []string
 	for _, s := range ordered {
-		mapper, ok := c.registry[s.EffectID]
+		d, ok := c.registry[s.EffectID]
 		if !ok {
 			return FilterGraph{}, fmt.Errorf("render: unknown effect id %q", s.EffectID)
 		}
-		frag, err := mapper(s)
+		frag, err := d.Compile(s)
 		if err != nil {
 			return FilterGraph{}, fmt.Errorf("render: compile effect %q: %w", s.EffectID, err)
 		}
-		if frag != "" {
-			fragments = append(fragments, frag)
+		if frag == "" {
+			continue
+		}
+		if d.Kind == KindAudio {
+			audio = append(audio, frag)
+		} else {
+			video = append(video, frag)
 		}
 	}
-	chain := strings.Join(fragments, ",")
-	return FilterGraph{FilterComplex: chain}, nil
+
+	// Subtitle burn-in is appended to the end of the video chain.
+	if sub := subtitleFilter(t.Recipe.Subtitle); sub != "" {
+		video = append(video, sub)
+	}
+
+	return FilterGraph{
+		Video: strings.Join(video, ","),
+		Audio: strings.Join(audio, ","),
+	}, nil
+}
+
+// subtitleFilter builds a drawtext filter for a burned-in caption, or "".
+func subtitleFilter(s recipe.Subtitle) string {
+	if strings.TrimSpace(s.Text) == "" {
+		return ""
+	}
+	size := s.FontSize
+	if size <= 0 {
+		size = 24
+	}
+	color := s.Color
+	if color == "" {
+		color = "white"
+	}
+	// Vertical placement.
+	y := "h-(text_h*2)" // bottom (default)
+	switch s.Position {
+	case "top":
+		y = "text_h"
+	case "center":
+		y = "(h-text_h)/2"
+	}
+	txt := escapeDrawtext(s.Text)
+
+	// A fontfile is required on systems without fontconfig (e.g. Windows).
+	fontArg := ""
+	if f := systemFontFile(); f != "" {
+		fontArg = "fontfile='" + escapeFontPath(f) + "':"
+	}
+
+	return fmt.Sprintf(
+		"drawtext=%stext='%s':fontcolor=%s:fontsize=%d:x=(w-text_w)/2:y=%s:box=1:boxcolor=black@0.5:boxborderw=8",
+		fontArg, txt, color, size, y,
+	)
+}
+
+// systemFontFile returns a path to a TrueType font available on this OS, or ""
+// if none is found (ffmpeg then relies on fontconfig, where available).
+func systemFontFile() string {
+	var candidates []string
+	switch runtime.GOOS {
+	case "windows":
+		win := os.Getenv("WINDIR")
+		if win == "" {
+			win = `C:\Windows`
+		}
+		candidates = []string{
+			filepath.Join(win, "Fonts", "arial.ttf"),
+			filepath.Join(win, "Fonts", "segoeui.ttf"),
+			filepath.Join(win, "Fonts", "tahoma.ttf"),
+		}
+	case "darwin":
+		candidates = []string{
+			"/System/Library/Fonts/Supplemental/Arial.ttf",
+			"/Library/Fonts/Arial.ttf",
+			"/System/Library/Fonts/Helvetica.ttc",
+		}
+	default: // linux
+		candidates = []string{
+			"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+			"/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+			"/usr/share/fonts/TTF/DejaVuSans.ttf",
+		}
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			return c
+		}
+	}
+	return ""
+}
+
+// escapeFontPath escapes a Windows path for use inside a drawtext filter
+// (backslashes and the drive colon must be escaped).
+func escapeFontPath(p string) string {
+	p = strings.ReplaceAll(p, `\`, `/`)
+	p = strings.ReplaceAll(p, `:`, `\:`)
+	return p
+}
+
+// escapeDrawtext escapes characters that break ffmpeg's drawtext parser.
+func escapeDrawtext(s string) string {
+	r := strings.NewReplacer(
+		`\`, `\\`,
+		`'`, "\u2019", // replace straight quote with a typographic one
+		`:`, `\:`,
+		`%`, `\%`,
+	)
+	return r.Replace(s)
 }
 
 // GPUProbe selects a hardware path, falling back to CPU when GPU is
@@ -161,25 +327,102 @@ func (e *CLIFFmpegExecutor) Execute(t Timeline, graph FilterGraph, path Encoding
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
 		return "", fmt.Errorf("mkdir output: %w", err)
 	}
-	args := []string{"-y", "-i", t.Source.FilePath}
 
-	// Apply the first segment as a trim window when present.
+	music := t.Recipe.Audio
+	hasMusic := strings.TrimSpace(music.FilePath) != ""
+
+	args := []string{"-y"}
+
+	// Trim window applies to the source input (before -i for fast seek).
+	var trimArgs []string
 	if len(t.Segments) > 0 {
 		seg := t.Segments[0]
-		args = append(args, "-ss", strconv.FormatFloat(seg.Start.Seconds(), 'f', 3, 64))
+		trimArgs = append(trimArgs, "-ss", strconv.FormatFloat(seg.Start.Seconds(), 'f', 3, 64))
 		if seg.End > seg.Start {
-			args = append(args, "-t", strconv.FormatFloat((seg.End-seg.Start).Seconds(), 'f', 3, 64))
+			trimArgs = append(trimArgs, "-t", strconv.FormatFloat((seg.End-seg.Start).Seconds(), 'f', 3, 64))
 		}
 	}
-	if graph.FilterComplex != "" {
-		args = append(args, "-vf", graph.FilterComplex)
+
+	// Source input (input 0) with trim.
+	args = append(args, trimArgs...)
+	args = append(args, "-i", t.Source.FilePath)
+
+	// Optional music input (input 1).
+	if hasMusic {
+		if music.Loop {
+			args = append(args, "-stream_loop", "-1")
+		}
+		args = append(args, "-i", music.FilePath)
 	}
+
+	if hasMusic {
+		// Use filter_complex to apply video filters + mix two audio streams.
+		fc := buildFilterComplex(graph, music)
+		args = append(args, "-filter_complex", fc,
+			"-map", "[vout]", "-map", "[aout]",
+			// End when the (trimmed) source ends, not when looped music ends.
+			"-shortest")
+	} else {
+		// Simple path: independent -vf / -af.
+		if graph.Video != "" {
+			args = append(args, "-vf", graph.Video)
+		}
+		if graph.Audio != "" {
+			args = append(args, "-af", graph.Audio)
+		}
+	}
+
 	args = append(args, "-c:v", path.Codec, "-preset", path.Preset, "-c:a", "aac", outputPath)
 
-	if _, err := e.run(e.binary, args...); err != nil {
-		return "", fmt.Errorf("ffmpeg exec: %w", err)
+	if out, err := e.run(e.binary, args...); err != nil {
+		return "", fmt.Errorf("ffmpeg exec: %w (output: %s)", err, tail(string(out), 400))
 	}
 	return outputPath, nil
+}
+
+// buildFilterComplex assembles a -filter_complex graph that applies the video
+// chain to the source video and mixes source audio with background music.
+func buildFilterComplex(graph FilterGraph, music recipe.AudioTrack) string {
+	var parts []string
+
+	// Video: [0:v] -> filters -> [vout]
+	if graph.Video != "" {
+		parts = append(parts, fmt.Sprintf("[0:v]%s[vout]", graph.Video))
+	} else {
+		parts = append(parts, "[0:v]copy[vout]")
+	}
+
+	// Source audio chain -> [a0]
+	srcVol := music.SourceVolume
+	if srcVol == 0 {
+		srcVol = 1
+	}
+	a0 := fmt.Sprintf("[0:a]volume=%.3f", srcVol)
+	if graph.Audio != "" {
+		a0 += "," + graph.Audio
+	}
+	a0 += "[a0]"
+	parts = append(parts, a0)
+
+	// Music chain -> [a1]
+	mvol := music.Volume
+	if mvol == 0 {
+		mvol = 0.3
+	}
+	parts = append(parts, fmt.Sprintf("[1:a]volume=%.3f[a1]", mvol))
+
+	// Mix the two audio streams -> [aout]
+	parts = append(parts, "[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[aout]")
+
+	return strings.Join(parts, ";")
+}
+
+// tail returns the last n chars of s (for error snippets).
+func tail(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return "..." + s[len(s)-n:]
 }
 
 // FileOutputValidator confirms the output exists and is non-empty.

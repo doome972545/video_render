@@ -61,9 +61,7 @@ func (c *Config) applyDefaults() {
 	if c.Concurrency <= 0 {
 		c.Concurrency = 4
 	}
-	if c.RulesProvider == nil {
-		c.RulesProvider = DefaultRules
-	}
+	// RulesProvider stays nil by default so per-job RemixOptions are honored.
 }
 
 // JobRequest is a single remix submission.
@@ -76,6 +74,8 @@ type JobRequest struct {
 	Seed int64
 	// Priority orders the render batch relative to others.
 	Priority Priority
+	// Options customizes effects/music/subtitle for this job.
+	Options RemixOptions
 }
 
 // Priority mirrors the queue priority levels for callers.
@@ -134,6 +134,9 @@ type Service struct {
 	pollDone      chan struct{}
 	pollerStarted bool
 	closed        bool
+	// curOpts holds the RemixOptions for the most recently started job so
+	// buildStages can construct the right RuleSet.
+	curOpts RemixOptions
 }
 
 // New constructs a Service with all stages wired. It does not start any job.
@@ -189,6 +192,11 @@ func (s *Service) StartJob(req JobRequest) (JobID, error) {
 	if req.Seed == 0 {
 		req.Seed = time.Now().UnixNano()
 	}
+
+	// Record this job's remix options for buildStages.
+	s.mu.Lock()
+	s.curOpts = req.Options
+	s.mu.Unlock()
 
 	id, err := s.engine.StartJob(engine.JobInput{
 		Source:       req.Source,
@@ -303,7 +311,18 @@ func (s *Service) buildStages(in engine.JobInput, capturedRaw *download.RawVideo
 		analyze.NewUniformMotionDetector(),
 	)
 
-	rules, dist := s.cfg.RulesProvider()
+	// Build rules: a custom RulesProvider (if set) wins; otherwise derive from
+	// this job's RemixOptions.
+	var rules recipe.RuleSet
+	var dist variant.DistributionRules
+	if s.cfg.RulesProvider != nil {
+		rules, dist = s.cfg.RulesProvider()
+	} else {
+		s.mu.Lock()
+		opts := s.curOpts
+		s.mu.Unlock()
+		rules, dist = BuildRules(opts)
+	}
 
 	recipeStage := recipe.NewRecipeStage(
 		recipe.NewRuleBasedGenerator(),

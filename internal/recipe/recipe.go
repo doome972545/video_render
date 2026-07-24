@@ -63,6 +63,30 @@ type Constraint struct {
 	MaxEffectSteps int           `json:"max_effect_steps"`
 }
 
+// AudioTrack describes optional background music mixed under the source audio.
+type AudioTrack struct {
+	// FilePath is a local path to a music/audio file. Empty means "no music".
+	FilePath string `json:"file_path,omitempty"`
+	// Volume scales the music (1.0 = original). Typical background: 0.1–0.4.
+	Volume float64 `json:"volume,omitempty"`
+	// SourceVolume scales the original audio (1.0 = keep). 0 = mute source.
+	SourceVolume float64 `json:"source_volume,omitempty"`
+	// Loop repeats the music to cover the whole video when true.
+	Loop bool `json:"loop,omitempty"`
+}
+
+// Subtitle describes text burned into the video.
+type Subtitle struct {
+	// Text is the literal caption to burn in. Empty means "no subtitle".
+	Text string `json:"text,omitempty"`
+	// FontSize in pixels. 0 = default (24).
+	FontSize int `json:"font_size,omitempty"`
+	// Color is an ffmpeg color name/hex (e.g. "white", "yellow"). Empty=white.
+	Color string `json:"color,omitempty"`
+	// Position: "bottom" (default), "top", or "center".
+	Position string `json:"position,omitempty"`
+}
+
 // Recipe is the canonical entity.
 type Recipe struct {
 	ID            RecipeID     `json:"id"`
@@ -70,6 +94,8 @@ type Recipe struct {
 	SourceRef     string       `json:"source_ref"` // fingerprint of the source
 	Segments      []Segment    `json:"segments"`
 	EffectSteps   []EffectStep `json:"effect_steps"`
+	Audio         AudioTrack   `json:"audio,omitempty"`
+	Subtitle      Subtitle     `json:"subtitle,omitempty"`
 	Constraint    Constraint   `json:"constraint"`
 	Seed          Seed         `json:"seed"`
 	Status        Status       `json:"status"`
@@ -99,10 +125,14 @@ func (r Recipe) Clone() Recipe {
 
 // RuleSet holds externalized, versioned business constraints for generation.
 type RuleSet struct {
-	Version       string       `json:"version"`
-	AllowedEffects []string    `json:"allowed_effects"`
-	Constraint    Constraint   `json:"constraint"`
-	BaseEffects   []EffectStep `json:"base_effects"` // template steps to seed a Draft
+	Version        string       `json:"version"`
+	AllowedEffects []string     `json:"allowed_effects"`
+	Constraint     Constraint   `json:"constraint"`
+	BaseEffects    []EffectStep `json:"base_effects"` // template steps to seed a Draft
+	// BaseAudio is background music applied to every generated recipe.
+	BaseAudio AudioTrack `json:"base_audio,omitempty"`
+	// BaseSubtitle is a caption applied to every generated recipe.
+	BaseSubtitle Subtitle `json:"base_subtitle,omitempty"`
 }
 
 // ValidationReport is the outcome of validating a Recipe.

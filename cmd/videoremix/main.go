@@ -22,6 +22,11 @@ func main() {
 		outDir      = flag.String("out", "output", "output directory for rendered videos")
 		gpu         = flag.Bool("gpu", false, "prefer GPU (nvenc) encoding when available")
 		concurrency = flag.Int("concurrency", 4, "max parallel renders")
+		music       = flag.String("music", "", "background music file to mix in (optional)")
+		musicVol    = flag.Float64("music-volume", 0.3, "background music volume (0..1)")
+		subtitle    = flag.String("subtitle", "", "caption text to burn into the video (optional)")
+		subPos      = flag.String("subtitle-pos", "bottom", "subtitle position: bottom|top|center")
+		extraFx     = flag.Bool("effects", false, "enable the wider random effect set (blur/zoom/hue/audio)")
 	)
 	flag.Parse()
 
@@ -47,6 +52,13 @@ func main() {
 		VariantCount: *count,
 		Seed:         *seed,
 		Priority:     app.PriorityNormal,
+		Options: app.RemixOptions{
+			MusicPath:        *music,
+			MusicVolume:      *musicVol,
+			SubtitleText:     *subtitle,
+			SubtitlePosition: *subPos,
+			ExtraEffects:     *extraFx,
+		},
 	})
 	if err != nil {
 		log.Fatalf("start job: %v", err)

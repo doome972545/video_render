@@ -42,6 +42,42 @@ h1 { margin: 0 0 2px; font-size: 26px; }
 .row { display: flex; gap: 8px; align-items: center; }
 .actions { margin: 16px 0 20px; }
 
+.section-title {
+  margin: 18px 0 10px;
+  padding-top: 14px;
+  border-top: 1px solid #2c3d5a;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #35486a;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+select:focus { border-color: var(--accent); }
+
+.checkbox-field { margin-top: 4px; }
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+  font-size: 14px;
+}
+.checkbox input { width: auto; }
+
 input {
   width: 100%;
   padding: 10px 12px;

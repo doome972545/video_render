@@ -39,6 +39,17 @@ go build -o videoremix.exe ./cmd/videoremix
 | `--out` | `output` | Output directory for rendered videos |
 | `--gpu` | `false` | Prefer GPU (nvenc) encoding when available |
 | `--concurrency` | `4` | Max parallel renders |
+| `--music` | | Background music file to mix in (optional) |
+| `--music-volume` | `0.3` | Background music volume (0..1) |
+| `--subtitle` | | Caption text burned into the video (optional) |
+| `--subtitle-pos` | `bottom` | Subtitle position: `bottom`, `top`, `center` |
+| `--effects` | `false` | Enable the wider random effect set (blur/zoom/hue/audio) |
+
+```powershell
+# Add background music, a burned-in caption, and richer random effects
+./videoremix.exe --source "clip.mp4" --variants 10 --effects `
+  --music "song.mp3" --music-volume 0.25 --subtitle "My Channel" --subtitle-pos bottom
+```
 
 ```powershell
 # Reproducible run

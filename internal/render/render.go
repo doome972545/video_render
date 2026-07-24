@@ -21,12 +21,16 @@ type EncodingPath struct {
 type Timeline struct {
 	Source   download.RawVideo
 	Segments []recipe.Segment
+	// Recipe is the full recipe so the executor can access audio/subtitle.
+	Recipe recipe.Recipe
 }
 
-// FilterGraph is the compiled FFmpeg filter description.
+// FilterGraph is the compiled FFmpeg filter description, split by stream kind.
 type FilterGraph struct {
-	// FilterComplex is the -filter_complex argument body.
-	FilterComplex string
+	// Video is the -vf chain (video filters), comma-joined.
+	Video string
+	// Audio is the -af chain (audio filters), comma-joined.
+	Audio string
 	// MapLabels are the output stream labels to -map.
 	MapLabels []string
 }
@@ -102,7 +106,7 @@ func (r *Renderer) Render(rec recipe.Recipe, raw download.RawVideo) (RenderResul
 		raw = resolved
 	}
 
-	timeline := Timeline{Source: raw, Segments: rec.Segments}
+	timeline := Timeline{Source: raw, Segments: rec.Segments, Recipe: rec}
 
 	graph, err := r.compiler.Compile(timeline, rec.EffectSteps)
 	if err != nil {
