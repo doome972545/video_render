@@ -22,6 +22,7 @@ contract, orchestrated by the `Engine` facade (`StartJob` / `CancelJob` /
 ```powershell
 # Build a small dev binary (relies on ffmpeg/yt-dlp on PATH)
 go build -o videoremix.exe ./cmd/videoremix
+# ...or use the helper: ./scripts/build.ps1 -Mode dev
 
 # Render 3 variants from a local file
 ./videoremix.exe --source "work\sample.mp4" --variants 3
@@ -58,7 +59,8 @@ go vet ./...                                                      # static check
 ### Project layout
 
 ```
-cmd/videoremix/       CLI entry point + dependency wiring
+cmd/videoremix/       CLI front end (thin wrapper over pkg/app)
+pkg/app/              Reusable, UI-agnostic core (import this from Wails/HTTP/etc.)
 internal/
   pipeline/   Stage, Context (immutable/append-only), Runner
   download/   RawVideo, InputClassifier, platform fetchers, validator
@@ -69,8 +71,13 @@ internal/
   queue/      job state machine, worker pool, retry policy, dead-letter
   engine/     facade orchestrating all stages
   binaries/   embed/resolve ffmpeg/ffprobe/yt-dlp
-scripts/      helper scripts (fetch-binaries.ps1)
+scripts/      helper scripts (build.ps1, fetch-binaries.ps1)
 ```
+
+> To embed this pipeline into a **Wails desktop app**, an HTTP server, or any
+> other Go program, import `videoremix/pkg/app`. See **[INTEGRATION.md](INTEGRATION.md)**
+> for a complete Wails example that ships ffmpeg embedded so end users install
+> nothing.
 
 ### Common tasks
 

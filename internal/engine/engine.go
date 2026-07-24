@@ -153,6 +153,18 @@ func (e *Engine) CancelJob(id JobID) error {
 	return nil
 }
 
+// ActiveJobs returns the IDs of all jobs Engine is tracking. Front ends can use
+// this to poll status for every in-flight job.
+func (e *Engine) ActiveJobs() []JobID {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	ids := make([]JobID, 0, len(e.jobs))
+	for id := range e.jobs {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
 // GetStatus returns aggregate status, refreshing render progress from Queue.
 func (e *Engine) GetStatus(id JobID) (JobStatus, error) {
 	e.mu.RLock()
